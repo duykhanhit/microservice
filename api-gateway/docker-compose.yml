@@ -1,0 +1,97 @@
+version: "3.8"
+
+networks:
+  kong-net:
+    external: false
+    name: kong-net
+volumes:
+  data-9.6: {}
+
+services:
+  kong-database:
+    image: postgres:9.6
+    container_name: kong-database
+    restart: on-failure
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - data-9.6:/var/lib/postgresql/data
+    networks:
+      - kong-net
+  kong-migrations:
+    platform: linux/x86_64
+    image: kong:3.3.1-alpine
+    container_name: kong-migrations
+    entrypoint: sh -c "sleep 10 && kong migrations bootstrap -v"
+    environment:
+      - KONG_DATABASE=postgres
+      - KONG_PG_HOST=kong-database
+      - KONG_PG_DATABASE=postgres
+      - KONG_PG_USER=postgres
+      - KONG_PG_PASSWORD=postgres
+      - KONG_CASSANDRA_CONTACT_POINTS=kong-database
+    depends_on:
+      - kong-database
+    networks:
+      - kong-net
+    restart: on-failure
+  kong:
+    platform: linux/x86_64
+    image: kong:3.3.1-alpine
+    container_name: kong
+    environment:
+      - KONG_DATABASE=postgres
+      - KONG_PG_HOST=kong-database
+      - KONG_PG_DATABASE=postgres
+      - KONG_PG_USER=postgres
+      - KONG_PG_PASSWORD=postgres
+      - KONG_CASSANDRA_CONTACT_POINTS=kong-database
+      - KONG_PROXY_ACCESS_LOG=/dev/stdout
+      - KONG_ADMIN_ACCESS_LOG=/dev/stdout
+      - KONG_PROXY_ERROR_LOG=/dev/stderr
+      - KONG_ADMIN_ERROR_LOG=/dev/stderr
+      - KONG_ADMIN_LISTEN=0.0.0.0:8001, 0.0.0.0:8444 ssl
+    ports:
+      - "8000:8000"
+      - "8443:8443"
+      - "8001:8001"
+      - "8444:8444"
+    restart: on-failure
+    depends_on:
+      - kong-database
+    networks:
+      - kong-net
+  # konga-prepare:
+  #   platform: linux/x86_64
+  #   image: pantsel/konga:latest
+  #   container_name: konga-prepare
+  #   command: "-c prepare -a postgres -u postgresql://postgres:postgres@kong-database:5432/konga"
+  #   networks:
+  #     - kong-net
+  #   restart: on-failure
+  #   depends_on:
+  #     - kong-database
+  konga:
+    platform: linux/x86_64
+    image: pantsel/konga:latest
+    container_name: konga
+    environment:
+      - TOKEN_SECRET=value
+      - DB_ADAPTER=postgres
+      - DB_HOST=kong-database
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_DATABASE=konga
+      - NODE_ENV=development
+      - KONGA_HOOK_TIMEOUT=10000
+    ports:
+      - "1337:1337"
+    restart: always
+    depends_on:
+      - kong-database
+      # - konga-prepare
+    networks:
+      - kong-net

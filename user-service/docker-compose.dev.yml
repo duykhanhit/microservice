@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  user-service:
+    container_name: user-service
+    build:
+      context: .
+      target: development
+      dockerfile: ./Dockerfile
+    ports:
+      - '3000'
+    # env_file:
+    #   - .env
+    command: npm run start:dev
+    networks:
+      - kong-net
+    volumes:
+      - .:/app
+      - /app/node_modules
+    restart: unless-stopped
+
+networks:
+  kong-net:
+    external: false
+    name: kong-net
