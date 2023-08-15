@@ -1,12 +1,14 @@
 import { HttpService } from '@nestjs/axios';
-import { Logger } from '@nestjs/common';
+import { Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { AxiosError } from 'axios';
 import { catchError, firstValueFrom } from 'rxjs';
 
-export class MicroserviceModule {
-  static async register(service: string, path: string): Promise<any> {
+export class KongGatewayModule implements OnApplicationBootstrap {
+  async onApplicationBootstrap() {
+    const service = 'user-service';
+    const path = '/api/users';
     const httpService = new HttpService();
-    const logger = new Logger(MicroserviceModule.name);
+    const logger = new Logger(KongGatewayModule.name);
 
     let serviceExist = null;
     try {
@@ -71,7 +73,7 @@ export class MicroserviceModule {
           .pipe(
             catchError((error: AxiosError) => {
               logger.error(error.message);
-              throw 'An error happened!';
+              throw error.message;
             }),
           ),
       );
